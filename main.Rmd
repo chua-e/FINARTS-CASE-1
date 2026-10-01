@@ -4,6 +4,55 @@ output: html_document
 date: "2026-09-15"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Case 1: Comprehensive Financial Regression Analysis
+
+Group 2:
+- Chua, Erin Gabrielle
+- Dilag, John Rey
+- Siasoyco, Gabriel
+- Singh, Gurmandeep
+
+# Setup
+
+Initialize packages.
+```{r}
+pacman::p_load(dplyr, ggplot2, quantmod, tidyverse, tidyquant, lubridate, timetk, zoo)
+
+library(dplyr)
+library(ggplot2)
+library(quantmod)
+library(tidyverse)
+library(tidyquant)
+library(lubridate)
+library(timetk)
+library(zoo)
+```
+
+```{r}
+# temporary
+DATE_FROM <- "2020-01-01"
+DATE_TO <- "2025-12-31"
+```
+
+```{r}
+# helper function
+get_month_end <- function(sym, name) {
+  x <- getSymbols(sym, src = "yahoo", from = DATE_FROM, to = DATE_TO,
+                  auto.assign = FALSE)
+  m <- to.monthly(Ad(x), indexAt = "lastof", OHLC = FALSE)
+  tibble(month = floor_date(index(m), "month"),
+         !!name := as.numeric(m))
+}
+
+# PLDT
+pldt  <- get_month_end("TEL.PS", "TEL_px")
+
+# PH stock exchange
+psei <- get_month_end("^PSEI",  "PSEi_px")
+
+# VIX
+getSymbols("VIXCLS", src = "FRED", from = DATE_FROM, to = DATE_TO)
+vix <- apply.monthly(na.omit(VIXCLS), mean)
+vix <- tibble(month = floor_date(index(vix), "month"),
+              VIX = as.numeric(vix))
 ```
