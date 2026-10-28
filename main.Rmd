@@ -30,7 +30,7 @@ library(zoo)
 
 ```{r}
 # temporary
-DATE_FROM <- "2020-01-01"
+DATE_FROM <- "2018-01-01"
 DATE_TO <- "2025-12-31"
 ```
 
