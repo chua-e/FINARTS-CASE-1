@@ -35,7 +35,7 @@ DATE_TO <- "2025-12-31"
 ```
 
 
-# Data Acquisition
+# 1. Data and Variables
 
 We first need to build a dataset with the following information
 1. Date - Year and Month
@@ -50,7 +50,12 @@ We first need to build a dataset with the following information
 10. Manufacturing-production growth - YoY % growth
 11. VIX - Monthly average
 
-We first start by getting the dates and the monthly PLDT and PSEi returns, as well as the VIX monthly average. We create a dataframe to hold all the information to be exported as a CSV file.
+We can start by creating a dataframe to store all our necessary data to be exported as a CSV file later.
+```{r}
+full_data <- data.frame()
+```
+
+We first get the dates and the monthly PLDT returns, as well as the VIX monthly average through the quantmod package and adding the data to our full dataset.
 
 ```{r}
 # helper function
@@ -65,14 +70,84 @@ get_month_end <- function(sym, name) {
 # PLDT
 pldt  <- get_month_end("PHI", "TEL_px")
 
-# PH stock exchange
-psei <- get_month_end("^PSEI.PS",  "PSEi_px")
-
 # VIX
 getSymbols("VIXCLS", src = "FRED", from = DATE_FROM, to = DATE_TO)
 vix <- apply.monthly(na.omit(VIXCLS), mean)
 vix <- tibble(month = floor_date(index(vix), "month"),
               VIX = as.numeric(vix))
+
+print(head(pldt, 5))
+print(head(vix, 5))
+```
+
+Now we add it to the corresponding columns.
+```{r}
+full_data <- pldt |>
+  full_join(vix, by = "month") |>
+  arrange(month) |>
+  mutate(PLDT = log(TEL_px / dplyr::lag(TEL_px)))
+
+head(full_data, 5)
+```
+
+Next we take Philippine Stock Exchange data from our `/data` folder and get the needed data.
+```{r}
+```
+
+From the same folder, we can keep adding to the full dataset until we our our final dataset
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+## Descriptive Statistics
+
+We can check our full dataset and interpret/check for scale, skewness, extreme values, and data problems
+```{r}
+```
+
+## Visualizations
+```{r}
+```
+
+# 2. Initial Regression Model
+```{r}
+```
+
+## Estimation
+```{r}
+```
+
+## Statistical Inference
+```{r}
+```
+
+# 3. Model Evaluation and Comparison
+```{r}
+```
+
+# 4. Regression Diagnostics
+## Multicollinearity
+```{r}
+```
+## Heteroskedasticity
+```{r}
+```
+## Autocorrelation
+```{r}
+```
+## Outliers/Influential Observations
+```{r}
 ```
 
 
+# 5. Model Improvements
+```{r}
+```
