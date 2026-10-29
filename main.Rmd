@@ -92,19 +92,112 @@ head(full_data, 5)
 
 Next we take Philippine Stock Exchange data from our `/data` folder and get the needed data.
 ```{r}
+psei <- read.csv("data/PSEi.csv") |>
+  mutate(
+    Date  = mdy(Date),
+    Price = parse_number(Price)
+  ) |>
+  arrange(Date) |>
+  group_by(month = floor_date(Date, "month")) |>
+  summarise(PSEi_px = last(Price), .groups = "drop") |>
+  mutate(PSEi = log(PSEi_px / dplyr::lag(PSEi_px)))
+
+head(psei, 5)
 ```
 
-From the same folder, we can keep adding to the full dataset until we our our final dataset
+From the same folder, we can keep reading the data and preparing it to be added to the final dataset.
 ```{r}
+ph_cpi <- read_csv("data/PH_CPI.csv", show_col_types = FALSE) |>
+  pivot_longer(-Year, names_to = "mon", values_to = "PH_CPI") |>
+  mutate(month = ymd(paste(Year, mon, "01"), locale = "C")) |>
+  arrange(month) |>
+  select(month, PH_CPI)
+head(ph_cpi, 5)
 ```
 
 ```{r}
+usd_php <- read_csv("data/USD_PHP.csv") |>
+  mutate(
+    month = make_date(year, match(month, month.name), 1)
+  ) |>
+  arrange(month) |>
+  transmute(
+    month,
+    USD_PHP_px = end_of_period,
+    USD_PHP    = log(USD_PHP_px / dplyr::lag(USD_PHP_px))
+  )
+
+head(usd_php)
 ```
 
 ```{r}
+bsp_rrp <- read.csv("data/BSP_RRP_Rate.csv") |>
+  mutate(
+    month = ymd(month)
+  ) |> 
+  arrange(month) |>
+  mutate (
+    value_diff = value - lag(value)
+  )
+
+head(bsp_rrp, 5)
 ```
 
 ```{r}
+ph_10y <- read.csv("data/PH_10Y_GS_Yield.csv") |>
+  mutate(
+    month = mdy(trimws(Month))
+  ) |> 
+  arrange(month) |>
+  mutate(
+    price = Price - lag(Price)
+  )
+
+head(ph_10y, 5)
+```
+
+```{r}
+m3 <- read.csv("data/PH_M3.csv") |>
+  mutate(
+    month = dmy(trimws(Date))
+  ) |> arrange (month)
+
+head(m3, 5)
+```
+
+```{r}
+ofwr <- read.csv("data/PH_OFW_Remittances.csv") |>
+  mutate (
+    month = make_date(year, match(month, month.name), 1)
+  ) |> 
+  arrange(month)
+
+head(ofwr, 5)
+```
+
+```{r}
+ph_manufacturing <- read.csv("data/PH_Manufacturing_Production.csv") |>
+  mutate(
+    month = ymd(Date)
+  ) |>
+  arrange(month)
+
+head(ph_manufacturing, 5)
+```
+
+Now we can join all our data to the full dataset using left joins on the date.
+```{r}
+full_data <- full_data |>
+  left_join(psei |> select(month, PSEi), by = "month") |>
+  left_join(cpi, by = "month") |>
+  left_join(usd_php |> select(month, USD_PHP), by = "month") |>
+  left_join(bsp_rrp |> select(month, value_diff), by = "month") |>
+  left_join(ph_10y |> select(month, price), by = "month") |>
+  left_join(m3 |> select(month, Close), by = "month") |>
+  left_join(ofrw |> select(month, Monthly), by = "month") |>
+  left_join(ph_manufacturing |> select(month, Value), by = "month")
+
+head(full_data, 10)
 ```
 
 ## Descriptive Statistics
