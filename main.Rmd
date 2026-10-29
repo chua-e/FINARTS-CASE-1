@@ -29,10 +29,28 @@ library(zoo)
 ```
 
 ```{r}
-# temporary
+# period start and end date constants
 DATE_FROM <- "2018-01-01"
 DATE_TO <- "2025-12-31"
 ```
+
+
+# Data Acquisition
+
+We first need to build a dataset with the following information
+1. Date - Year and Month
+2. PLDT (TEL) - Monthly log returns
+3. PSEi - Monthly log returns
+4. CPI inflation - YoY % change
+5. USD/PHP change - Monthly log change
+6. BSP RRP rate change - Month-end first difference
+7. Philippine 10Y government-yield change - Month-end first difference
+8. M3 growth - YoY % growth
+9. OFW remittance growth - YoY % growth
+10. Manufacturing-production growth - YoY % growth
+11. VIX - Monthly average
+
+We first start by getting the dates and the monthly PLDT and PSEi returns, as well as the VIX monthly average. We create a dataframe to hold all the information to be exported as a CSV file.
 
 ```{r}
 # helper function
@@ -45,10 +63,10 @@ get_month_end <- function(sym, name) {
 }
 
 # PLDT
-pldt  <- get_month_end("TEL.PS", "TEL_px")
+pldt  <- get_month_end("PHI", "TEL_px")
 
 # PH stock exchange
-psei <- get_month_end("^PSEI",  "PSEi_px")
+psei <- get_month_end("^PSEI.PS",  "PSEi_px")
 
 # VIX
 getSymbols("VIXCLS", src = "FRED", from = DATE_FROM, to = DATE_TO)
@@ -56,3 +74,5 @@ vix <- apply.monthly(na.omit(VIXCLS), mean)
 vix <- tibble(month = floor_date(index(vix), "month"),
               VIX = as.numeric(vix))
 ```
+
+
