@@ -220,7 +220,19 @@ datasummary_skim(full_data |> dplyr::select(-month))
 ```
 
 ## Visualizations
+
+Monthly PLDT log returns
 ```{r}
+ggplot(full_data, aes(month, PLDT)) +
+  geom_line() +
+  labs(title = "PLDT (TEL) monthly log return", x = NULL, y = "Log return")
+```
+
+```{r}
+ggplot(full_data, aes(PLDT)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = .6) +
+  geom_density() +
+  labs(title = "Distribution of TEL monthly log return", x = "Log return")
 ```
 
 # 2. Initial Regression Model
