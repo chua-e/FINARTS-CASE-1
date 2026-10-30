@@ -37,7 +37,6 @@ set.seed(2026)
 # period start and end date constants
 DATE_FROM <- as.Date("2014-12-01")
 DATE_TO   <- as.Date("2026-09-30")
-SAMPLE_START <- as.Date("2016-01-01")
 ```
 
 
@@ -116,8 +115,8 @@ From the same folder, we can keep reading the data and preparing it to be added 
 ph_cpi <- read_csv("data/PH_CPI.csv", show_col_types = FALSE) |>
   pivot_longer(-Year, names_to = "mon", values_to = "PH_CPI") |>
   mutate(month = ymd(paste(Year, mon, "01"), locale = "C")) |>
-  arrange(month) |>
-  select(month, PH_CPI)
+  arrange(month) 
+
 head(ph_cpi, 5)
 ```
 
@@ -198,16 +197,16 @@ head(ph_manufacturing, 5)
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
 full_data <- full_data |>
-  filter(month >= SAMPLE_START) |>
-  select(-TEL_px) |>
-  left_join(psei |> select(month, PSEi), by = "month") |>
+  filter(month >= as.Date("2018-01-01")) |>
+  left_join(psei |> dplyr::select(month, PSEi), by = "month") |>
   left_join(ph_cpi, by = "month") |>
-  left_join(usd_php |> select(month, USD_PHP), by = "month") |>
-  left_join(bsp_rrp |> select(month, BSP_RRP_Rate), by = "month") |>
-  left_join(ph_10y |> select(month, PH_10Y_GS_Yield), by = "month") |>
-  left_join(m3 |> select(month, PH_M3), by = "month") |>
-  left_join(ofwr |> select(month, PH_OFW_Remittances), by = "month") |>
-  left_join(ph_manufacturing |> select(month, PH_Manufacturing_Production), by = "month")
+  left_join(usd_php |> dplyr::select(month, USD_PHP), by = "month") |>
+  left_join(bsp_rrp |> dplyr::select(month, BSP_RRP_Rate), by = "month") |>
+  left_join(ph_10y |> dplyr::select(month, PH_10Y_GS_Yield), by = "month") |>
+  left_join(m3 |> dplyr::select(month, PH_M3), by = "month") |>
+  left_join(ofwr |> dplyr::select(month, PH_OFW_Remittances), by = "month") |>
+  left_join(ph_manufacturing |> dplyr::select(month, PH_Manufacturing_Production), by = "month") |>
+  dplyr::select(-TEL_px)
 
 head(full_data, 10)
 write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
@@ -217,7 +216,7 @@ write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
 
 We can check our full dataset and interpret/check for scale, skewness, extreme values, and data problems
 ```{r}
-
+datasummary_skim(full_data |> dplyr::select(-month))
 ```
 
 ## Visualizations
