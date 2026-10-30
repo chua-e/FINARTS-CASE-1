@@ -30,7 +30,7 @@ library(zoo)
 
 ```{r}
 # period start and end date constants
-DATE_FROM <- "2018-01-01"
+DATE_FROM <- "2017-12-01"
 DATE_TO <- "2025-12-31"
 ```
 
@@ -137,7 +137,7 @@ bsp_rrp <- read.csv("data/BSP_RRP_Rate.csv") |>
   ) |> 
   arrange(month) |>
   mutate (
-    value_diff = value - lag(value)
+    BSP_RRP_Rate = value - lag(value)
   )
 
 head(bsp_rrp, 5)
@@ -150,7 +150,7 @@ ph_10y <- read.csv("data/PH_10Y_GS_Yield.csv") |>
   ) |> 
   arrange(month) |>
   mutate(
-    price = Price - lag(Price)
+    PH_10Y_GS_Yield = Price - lag(Price)
   )
 
 head(ph_10y, 5)
@@ -160,7 +160,9 @@ head(ph_10y, 5)
 m3 <- read.csv("data/PH_M3.csv") |>
   mutate(
     month = dmy(trimws(Date))
-  ) |> arrange (month)
+  ) |> 
+  arrange (month) |>
+  rename(PH_M3 = Close)
 
 head(m3, 5)
 ```
@@ -170,7 +172,8 @@ ofwr <- read.csv("data/PH_OFW_Remittances.csv") |>
   mutate (
     month = make_date(year, match(month, month.name), 1)
   ) |> 
-  arrange(month)
+  arrange(month) |>
+  rename(PH_OFW_Remittances = Monthly)
 
 head(ofwr, 5)
 ```
@@ -180,7 +183,8 @@ ph_manufacturing <- read.csv("data/PH_Manufacturing_Production.csv") |>
   mutate(
     month = ymd(Date)
   ) |>
-  arrange(month)
+  arrange(month) |>
+  rename(PH_Manufacturing_Production = Value)
 
 head(ph_manufacturing, 5)
 ```
@@ -188,16 +192,19 @@ head(ph_manufacturing, 5)
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
 full_data <- full_data |>
+  filter(month >= as.Date("2018-01-01")) |>
+  select(-TEL_px) |>
   left_join(psei |> select(month, PSEi), by = "month") |>
-  left_join(cpi, by = "month") |>
+  left_join(ph_cpi, by = "month") |>
   left_join(usd_php |> select(month, USD_PHP), by = "month") |>
-  left_join(bsp_rrp |> select(month, value_diff), by = "month") |>
-  left_join(ph_10y |> select(month, price), by = "month") |>
-  left_join(m3 |> select(month, Close), by = "month") |>
-  left_join(ofrw |> select(month, Monthly), by = "month") |>
-  left_join(ph_manufacturing |> select(month, Value), by = "month")
+  left_join(bsp_rrp |> select(month, BSP_RRP_Rate), by = "month") |>
+  left_join(ph_10y |> select(month, PH_10Y_GS_Yield), by = "month") |>
+  left_join(m3 |> select(month, PH_M3), by = "month") |>
+  left_join(ofwr |> select(month, PH_OFW_Remittances), by = "month") |>
+  left_join(ph_manufacturing |> select(month, PH_Manufacturing_Production), by = "month")
 
 head(full_data, 10)
+write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
 ```
 
 ## Descriptive Statistics
