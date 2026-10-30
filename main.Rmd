@@ -16,22 +16,28 @@ Group 2:
 
 Initialize packages.
 ```{r}
-pacman::p_load(dplyr, ggplot2, quantmod, tidyverse, tidyquant, lubridate, timetk, zoo)
+pacman::p_load(dplyr, ggplot2, quantmod, tidyverse, tidyquant, lubridate, timetk, zoo, car, sandwich, modelsummary, glmnet, MASS)
 
 library(dplyr)
+library(tidyr)
 library(ggplot2)
-library(quantmod)
-library(tidyverse)
-library(tidyquant)
 library(lubridate)
-library(timetk)
-library(zoo)
+library(broom)
+library(car)
+library(lmtest)
+library(sandwich)
+library(modelsummary)
+library(glmnet)
+library(MASS, exclude = "select")
+
+set.seed(2026)
 ```
 
 ```{r}
 # period start and end date constants
-DATE_FROM <- "2017-12-01"
-DATE_TO <- "2025-12-31"
+DATE_FROM <- as.Date("2014-12-01")
+DATE_TO   <- as.Date("2026-09-30")
+SAMPLE_START <- as.Date("2016-01-01")
 ```
 
 
@@ -192,7 +198,7 @@ head(ph_manufacturing, 5)
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
 full_data <- full_data |>
-  filter(month >= as.Date("2018-01-01")) |>
+  filter(month >= SAMPLE_START) |>
   select(-TEL_px) |>
   left_join(psei |> select(month, PSEi), by = "month") |>
   left_join(ph_cpi, by = "month") |>
@@ -211,6 +217,7 @@ write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
 
 We can check our full dataset and interpret/check for scale, skewness, extreme values, and data problems
 ```{r}
+
 ```
 
 ## Visualizations
@@ -218,11 +225,41 @@ We can check our full dataset and interpret/check for scale, skewness, extreme v
 ```
 
 # 2. Initial Regression Model
-```{r}
-```
 
+Next we have an initial regression model, we use Multiple Linear Regression (MLR) because our dependent variable (PLDT log returns) depends on multiple independent variables as mentioned above. We use the following formula:
+$$
+\begin{aligned}
+Y_i
+&= \beta_0 +
+\beta_1 X_{1i} +
+\beta_2 X_{2i} +
+\beta_3 X_{3i} +
+\cdots +
+\beta_k X_{ki} +
+\varepsilon_i\\[6pt]
+&\text{Where:}\\
+&Y_i = \text{dependent variable for observation } i,\\
+&X_{ji} = \text{value of explanatory variable } j \text{ for observation } i,\\
+&\beta_0 = \text{intercept},\\
+&\beta_j = \text{coefficient on explanatory variable } j,\\
+&\varepsilon_i = \text{error term for observation } i,\\
+&k = \text{number of explanatory variables}.
+\end{aligned}
+$$
 ## Estimation
 ```{r}
+m_full <- lm(
+  PLDT ~ PSEi + PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
+    PH_M3 + PH_OFW_Remittances + PH_Manufacturing_Production + VIX,
+  data = full_data
+)
+
+summary(m_full)
+```
+
+```{r}
+tidy(m_full, conf.int = TRUE)
+glance(m_full)
 ```
 
 ## Statistical Inference
