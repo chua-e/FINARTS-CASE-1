@@ -197,7 +197,8 @@ head(ph_manufacturing, 5)
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
 full_data <- full_data |>
-  filter(month >= as.Date("2018-01-01")) |>
+  filter(month >= as.Date("2018-01-01") + months(1),
+         month <= as.Date(DATE_TO)) |>
   left_join(psei |> dplyr::select(month, PSEi), by = "month") |>
   left_join(ph_cpi, by = "month") |>
   left_join(usd_php |> dplyr::select(month, USD_PHP), by = "month") |>
@@ -207,7 +208,7 @@ full_data <- full_data |>
   left_join(ofwr |> dplyr::select(month, PH_OFW_Remittances), by = "month") |>
   left_join(ph_manufacturing |> dplyr::select(month, PH_Manufacturing_Production), by = "month") |>
   dplyr::select(-TEL_px)
-
+  
 head(full_data, 10)
 write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
 ```
@@ -275,18 +276,44 @@ glance(m_full)
 
 ## Statistical Inference
 ```{r}
+confint(m_full)
+```
+
+```{r}
+colSums(is.na(full_data))
+full_data |> filter(if_any(everything(), is.na))
 ```
 
 # 3. Model Evaluation and Comparison
 ```{r}
+m_market <- lm(PLDT ~ PSEi, data = full_data)
+m_macro  <- lm(PLDT ~ PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
+                 PH_M3 + PH_OFW_Remittances + PH_Manufacturing_Production + VIX,
+               data = full_data)
+
+modelsummary(
+  list("Market only" = m_market, "Macro only" = m_macro, "Full" = m_full),
+  stars = TRUE, gof_omit = "Log.Lik|RMSE"
+)
+
+AIC(m_market, m_macro, m_full)
+BIC(m_market, m_macro, m_full)
+
+anova(m_market, m_full)
 ```
 
 # 4. Regression Diagnostics
 ## Multicollinearity
 ```{r}
+vif(m_full)
 ```
 ## Heteroskedasticity
 ```{r}
+plot(fitted(m_full), resid(m_full),
+     xlab = "Fitted", ylab = "Residuals", main = "Residuals vs. Fitted")
+abline(h = 0, lty = 2)
+
+bptest(m_full)
 ```
 ## Autocorrelation
 ```{r}
