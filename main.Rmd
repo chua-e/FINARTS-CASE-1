@@ -36,7 +36,7 @@ set.seed(2026)
 ```{r}
 # period start and end date constants
 DATE_FROM <- as.Date("2014-12-01")
-DATE_TO   <- as.Date("2026-09-30")
+DATE_TO   <- as.Date("2025-12-31")
 ```
 
 
@@ -200,7 +200,7 @@ full_data <- full_data |>
   filter(month >= as.Date("2018-01-01") + months(1),
          month <= as.Date(DATE_TO)) |>
   left_join(psei |> dplyr::select(month, PSEi), by = "month") |>
-  left_join(ph_cpi, by = "month") |>
+  left_join(ph_cpi |> dplyr::select(month, PH_CPI), by = "month") |>
   left_join(usd_php |> dplyr::select(month, USD_PHP), by = "month") |>
   left_join(bsp_rrp |> dplyr::select(month, BSP_RRP_Rate), by = "month") |>
   left_join(ph_10y |> dplyr::select(month, PH_10Y_GS_Yield), by = "month") |>
@@ -234,6 +234,16 @@ ggplot(full_data, aes(PLDT)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = .6) +
   geom_density() +
   labs(title = "Distribution of TEL monthly log return", x = "Log return")
+```
+
+```{r}
+full_data |>
+  pivot_longer(-c(month, PLDT), names_to = "var", values_to = "x") |>
+  ggplot(aes(x, PLDT)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ var, scales = "free_x") +
+  labs(title = "PLDT return vs. each candidate regressor", x = NULL)
 ```
 
 # 2. Initial Regression Model
