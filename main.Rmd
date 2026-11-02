@@ -318,6 +318,8 @@ full_data |> filter(if_any(everything(), is.na))
 
 # 3. Model Evaluation and Comparison
 ```{r}
+full_data_clean <- model.frame(m_full)
+
 m_market <- lm(PLDT ~ PSEi, data = full_data)
 m_macro  <- lm(PLDT ~ PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
                  PH_M3 + PH_OFW_Remittances + PH_Manufacturing_Production + VIX,
@@ -389,4 +391,24 @@ knitr::kable(
 
 # 5. Model Improvements
 ```{r}
+m_step <- MASS::stepAIC(m_full, direction = "both", trace = FALSE) # Stepwise Model Selection
+
+vcov_hc3 <- sandwich::vcovHC(m_full, type = "HC3") # HC3 Robust Standard Errors
+vcov_hac <- sandwich::NeweyWest(m_full, lag = 2, prewhite = FALSE) # Newey-West HAC Standard Errors
+m_robust <- MASS::rlm(
+  PLDT ~ PSEi + PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
+    PH_M3 + PH_OFW_Remittances + PH_Manufacturing_Production + VIX,
+  data = full_data) # Huber M-Estimator Robust Regression
+
+modelsummary::modelsummary(
+  list(
+    "Initial OLS"          = m_full,
+    "OLS (HC3 Robust)"     = m_full,
+    "OLS (Newey-West HAC)" = m_full,
+    "Stepwise AIC"         = m_step,
+    "Huber Robust (RLM)"   = m_robust),
+  vcov = list(NULL, vcov_hc3, vcov_hac, NULL, NULL),
+  stars = TRUE,
+  gof_omit = "Log.Lik|RMSE",
+  title = "Table 5.1: Model Comparison — Initial OLS, Robust Standard Errors, Stepwise Model, and Huber RLM")
 ```
