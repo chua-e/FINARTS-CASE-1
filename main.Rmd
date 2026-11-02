@@ -136,6 +136,15 @@ head(usd_php)
 ```
 
 ```{r}
+full_data <- full_data |>
+  left_join(usd_php |> dplyr::select(month, USD_PHP_px, USD_PHP), by = "month") |>
+  mutate(
+    TEL_php = TEL_px * USD_PHP_px,
+    PLDT    = log(TEL_php / dplyr::lag(TEL_php))
+)
+```
+
+```{r}
 bsp_rrp <- read.csv("data/BSP_RRP_Rate.csv") |>
   mutate(
     month = ymd(month)
@@ -197,17 +206,16 @@ head(ph_manufacturing, 5)
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
 full_data <- full_data |>
-  filter(month >= as.Date("2018-01-01") + months(1),
+  filter(month >= as.Date("2018-01-01"),
          month <= as.Date(DATE_TO)) |>
   left_join(psei |> dplyr::select(month, PSEi), by = "month") |>
   left_join(ph_cpi |> dplyr::select(month, PH_CPI), by = "month") |>
-  left_join(usd_php |> dplyr::select(month, USD_PHP), by = "month") |>
   left_join(bsp_rrp |> dplyr::select(month, BSP_RRP_Rate), by = "month") |>
   left_join(ph_10y |> dplyr::select(month, PH_10Y_GS_Yield), by = "month") |>
   left_join(m3 |> dplyr::select(month, PH_M3), by = "month") |>
   left_join(ofwr |> dplyr::select(month, PH_OFW_Remittances), by = "month") |>
   left_join(ph_manufacturing |> dplyr::select(month, PH_Manufacturing_Production), by = "month") |>
-  dplyr::select(-TEL_px)
+  dplyr::select(-c(TEL_px, TEL_php, USD_PHP_px))
   
 head(full_data, 10)
 write.csv(full_data, "data/fulldata.csv", row.names = FALSE)
@@ -222,20 +230,29 @@ datasummary_skim(full_data |> dplyr::select(-month))
 
 ## Visualizations
 
-Monthly PLDT log returns
+To get a better picture of our data, we perform data visualization to help see data points and relations better.
+
+**Monthly PLDT log returns**
 ```{r}
 ggplot(full_data, aes(month, PLDT)) +
   geom_line() +
-  labs(title = "PLDT (TEL) monthly log return", x = NULL, y = "Log return")
+  labs(title = "PLDT monthly log return", x = NULL, y = "Log return")
 ```
 
+We can see that the values hovers around zero with no trend. Swings are relatively large (about -0.27 to +0.20), and there’s a big drop around late 2022 and a big gain around mid-2021. These highs and lows show historical events that affect returns, because in late 2022 PLDT Inc. experienced a major corporate crisis driven by a massive ₱48-billion capital expenditure budget overrun (https://insiderph.com/case-closed-pldt-settles-p167-m-budget-overrun-lawsuit-in-california-court). While in mid-2021 PLDT reported having record-breaking financial figures and massive fiber network expansion due to pandemic-era remote work and online learning(https://www.rappler.com/business/pldt-earnings-report-january-december-2021/). 
+
+
+**DIstribution of PLDT monthly log return**
 ```{r}
 ggplot(full_data, aes(PLDT)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = .6) +
   geom_density() +
-  labs(title = "Distribution of TEL monthly log return", x = "Log return")
+  labs(title = "Distribution of PLDT monthly log return", x = "Log return")
 ```
 
+The histogram shown is roughly bell-shaped but with a heavier left tail (implying that several months have returns below -0.15).
+
+**PLDT returns vs. candidate regressors**
 ```{r}
 full_data |>
   pivot_longer(-c(month, PLDT), names_to = "var", values_to = "x") |>
@@ -245,6 +262,11 @@ full_data |>
   facet_wrap(~ var, scales = "free_x") +
   labs(title = "PLDT return vs. each candidate regressor", x = NULL)
 ```
+
+There were some interesting scatterplot observations, where we evaluate best fit between each regressor against PLDT returns:
+- PSEi slopes up and USD_PHP slopes down. This implies that in months where PSEi was higher, PLDT returns were higher. While in months when the peso weakened more, PLDT’s return tended to be lower. 
+- BSP_RRP_Rate, PH_10Y_GS_Yield, and PH_OFW_Remittances show a slight downward slope, implying that higher interest rates, government yields, or remittance growths slightly coincide with lower PLDT returns. On the other hand PH_M3 and PH_Manufacturing_Production show slight upward slopes indicating minor positive co-movement with PLDT returns
+- VIX Shows a slight positive trend, indicating higher global market volatility weakly correlates with higher PLDT returns.
 
 # 2. Initial Regression Model
 
