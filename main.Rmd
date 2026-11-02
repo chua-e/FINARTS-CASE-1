@@ -7,9 +7,13 @@ date: "2026-09-15"
 # Case 1: Comprehensive Financial Regression Analysis
 
 Group 2:
+
 - Chua, Erin Gabrielle
+
 - Dilag, John Rey
+
 - Siasoyco, Gabriel
+
 - Singh, Gurmandeep
 
 # Setup
@@ -43,16 +47,27 @@ DATE_TO   <- as.Date("2025-12-31")
 # 1. Data and Variables
 
 We first need to build a dataset with the following information
+
 1. Date - Year and Month
+
 2. PLDT (TEL) - Monthly log returns
+
 3. PSEi - Monthly log returns
+
 4. CPI inflation - YoY % change
+
 5. USD/PHP change - Monthly log change
+
 6. BSP RRP rate change - Month-end first difference
+
 7. Philippine 10Y government-yield change - Month-end first difference
+
 8. M3 growth - YoY % growth
+
 9. OFW remittance growth - YoY % growth
+
 10. Manufacturing-production growth - YoY % growth
+
 11. VIX - Monthly average
 
 We can start by creating a dataframe to store all our necessary data to be exported as a CSV file later.
@@ -228,6 +243,9 @@ We can check our full dataset and interpret/check for scale, skewness, extreme v
 datasummary_skim(full_data |> dplyr::select(-month))
 ```
 
+PH_Manufacturing_Production stands out as an evident outlier in the data, with a standard deviation of 103.3. Although
+
+
 ## Visualizations
 
 To get a better picture of our data, we perform data visualization to help see data points and relations better.
@@ -264,8 +282,11 @@ full_data |>
 ```
 
 There were some interesting scatterplot observations, where we evaluate best fit between each regressor against PLDT returns:
+
 - PSEi slopes up and USD_PHP slopes down. This implies that in months where PSEi was higher, PLDT returns were higher. While in months when the peso weakened more, PLDT’s return tended to be lower. 
+
 - BSP_RRP_Rate, PH_10Y_GS_Yield, and PH_OFW_Remittances show a slight downward slope, implying that higher interest rates, government yields, or remittance growths slightly coincide with lower PLDT returns. On the other hand PH_M3 and PH_Manufacturing_Production show slight upward slopes indicating minor positive co-movement with PLDT returns
+
 - VIX Shows a slight positive trend, indicating higher global market volatility weakly correlates with higher PLDT returns.
 
 # 2. Initial Regression Model
@@ -290,7 +311,21 @@ Y_i
 &k = \text{number of explanatory variables}.
 \end{aligned}
 $$
+For this section, we have the following null and alternative hypothesis at $\alpha = 0.05$
+$$
+\begin{aligned}
+H_0&: \beta_j = 0 \\
+H_1&: \beta_j \neq 0
+\\
+&\text{Where:}\\
+&\beta = \text{A regressor coefficient}\\
+&j = 1, 2, \dots, 9 \text{ (regressor index)}\\
+\end{aligned}
+$$
+
 ## Estimation
+
+Here we use `lm()` to fit a linear regression model on our data and `summary()` acts as a diagnostic report evaluating the fit, coefficients, and statistical significance of the regression model.
 ```{r}
 m_full <- lm(
   PLDT ~ PSEi + PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
@@ -300,13 +335,17 @@ m_full <- lm(
 
 summary(m_full)
 ```
+First, we see here that there us an adjusted R-squared of 0.08053 (or 8.053%), meaning that 9 regressors combined only explain 8.053% of the variation in PLDT returns, while the remaining ~92% is influenced by other factors not captured by the model. Next, looking at the p-value of 0.05887, we see that it is only slightly above the standard 0.05 threshold, further showing that the model is only somewhat significant. Therefore we fail to reject the null hypothesis. 
 
-```{r}
-tidy(m_full, conf.int = TRUE)
-glance(m_full)
-```
+Looking at the `Pr(>|t|)` column, we see that the p-values for each individual regressor, almost all of them have values well above 0.05, meaning they are statistically insignificant individually. PSEi has the strongest relationship in the model. A 1-unit increase in PSEi returns is associated with a ~0.33 increase in PLDT returns, because its p-value is under 0.10, it is marginally significant at the 10% level.
+
+While variables like PH_CPI, USD_PHP, BSP_RRP_Rate, PH_10Y_GS_Yield, PH_M3, PH_OFW_Remittances, PH_Manufacturing_Production, and VIX all have high p-values (> 0.10), but have no statistical significant over PLDT's returns when accounting for other regressors due to its low coefficient values.
+
 
 ## Statistical Inference
+
+This would serve as the basis of <>
+
 ```{r}
 confint(m_full)
 ```
@@ -317,6 +356,8 @@ full_data |> filter(if_any(everything(), is.na))
 ```
 
 # 3. Model Evaluation and Comparison
+
+Next we perform
 ```{r}
 full_data_clean <- model.frame(m_full)
 
