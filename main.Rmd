@@ -361,7 +361,29 @@ full_data_diag <- model.frame(m_full) |>
     leverage = hatvalues(m_full),
     std_resid = rstandard(m_full))
 
+n <- nrow(full_data_diag)
+cutoff <- 4/n
 
+ggplot(full_data_diag, aes(x = month, y = cooks_d)) + geom_bar(stat = "identity", fill = "steelblue", width = 20) +
+  geom_hline(yintercept = cutoff, color = "red", linetype = "dashed", linewidth = 0.8) +
+  annotate("text", x = max(full_data_diag$month) - months(12), y = cutoff + 0.015, label = paste("Threshold (4/n = ", round(cutoff, 4),
+  ")", sep = ""), color = "red") + 
+  labs(
+    title = "Cook's Distance: Influential Monthly Observations",
+    subtitle = "PLDT (TEL) Monthly Log Return Model",
+    x = NULL,
+    y = "Cook's Distance") +
+  theme_minimal()
+
+influential_table <- full_data_diag |>
+  filter(cooks_d > cutoff) |>
+  dplyr::select(month, PLDT, PSEi, USD_PHP, cooks_d, leverage) |>
+  arrange(desc(cooks_d)) |>
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+knitr::kable(
+  influential_table,
+  caption = "Table: Observations Exceeding Cook's Distance Threshold (4/n)")
 ```
 
 
