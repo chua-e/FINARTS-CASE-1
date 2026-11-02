@@ -349,9 +349,19 @@ bptest(m_full)
 ```
 ## Autocorrelation
 ```{r}
+dwtest(m_full)
+bgtest(m_full, order = 2)
 ```
 ## Outliers/Influential Observations
 ```{r}
+full_data_diag <- model.frame(m_full) |>
+  mutate( 
+    month = full_data$month[!is.na(full_data$PH_Manufacturing_Production)],
+    cooks_d = cooks.distance(m_full),
+    leverage = hatvalues(m_full),
+    std_resid = rstandard(m_full))
+
+
 ```
 
 
