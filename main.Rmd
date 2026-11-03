@@ -8,13 +8,10 @@ date: "2026-09-15"
 
 Group 2:
 
-- Chua, Erin Gabrielle
-
-- Dilag, John Rey
-
-- Siasoyco, Gabriel
-
-- Singh, Gurmandeep
+* Chua, Erin Gabrielle
+* Dilag, John Rey
+* Siasoyco, Gabriel
+* Singh, Gurmandeep
 
 # Setup
 
@@ -110,7 +107,7 @@ full_data <- pldt |>
 head(full_data, 5)
 ```
 
-Next we take Philippine Stock Exchange data from our `/data` folder and get the needed data.
+Next we take needed regressors from our `/data` folder and clean it to be added to our full dataset alongside PLDT and VIX returns.
 ```{r}
 psei <- read.csv("data/PSEi.csv") |>
   mutate(
@@ -122,20 +119,11 @@ psei <- read.csv("data/PSEi.csv") |>
   summarise(PSEi_px = last(Price), .groups = "drop") |>
   mutate(PSEi = log(PSEi_px / dplyr::lag(PSEi_px)))
 
-head(psei, 5)
-```
-
-From the same folder, we can keep reading the data and preparing it to be added to the final dataset.
-```{r}
 ph_cpi <- read_csv("data/PH_CPI.csv", show_col_types = FALSE) |>
   pivot_longer(-Year, names_to = "mon", values_to = "PH_CPI") |>
   mutate(month = ymd(paste(Year, mon, "01"), locale = "C")) |>
   arrange(month) 
 
-head(ph_cpi, 5)
-```
-
-```{r}
 usd_php <- read_csv("data/USD_PHP.csv") |>
   mutate(
     month = make_date(year, match(month, month.name), 1)
@@ -147,19 +135,13 @@ usd_php <- read_csv("data/USD_PHP.csv") |>
     USD_PHP    = log(USD_PHP_px / dplyr::lag(USD_PHP_px))
   )
 
-head(usd_php)
-```
-
-```{r}
 full_data <- full_data |>
-  left_join(usd_php |> dplyr::select(month, USD_PHP_px, USD_PHP), by = "month") |>
-  mutate(
-    TEL_php = TEL_px * USD_PHP_px,
-    PLDT    = log(TEL_php / dplyr::lag(TEL_php))
-)
-```
+    left_join(usd_php |> dplyr::select(month, USD_PHP_px, USD_PHP), by = "month") |>
+            mutate(
+              TEL_php = TEL_px * USD_PHP_px,
+              PLDT    = log(TEL_php / dplyr::lag(TEL_php))
+            )
 
-```{r}
 bsp_rrp <- read.csv("data/BSP_RRP_Rate.csv") |>
   mutate(
     month = ymd(month)
@@ -169,10 +151,6 @@ bsp_rrp <- read.csv("data/BSP_RRP_Rate.csv") |>
     BSP_RRP_Rate = value - lag(value)
   )
 
-head(bsp_rrp, 5)
-```
-
-```{r}
 ph_10y <- read.csv("data/PH_10Y_GS_Yield.csv") |>
   mutate(
     month = mdy(trimws(Month))
@@ -182,10 +160,6 @@ ph_10y <- read.csv("data/PH_10Y_GS_Yield.csv") |>
     PH_10Y_GS_Yield = Price - lag(Price)
   )
 
-head(ph_10y, 5)
-```
-
-```{r}
 m3 <- read.csv("data/PH_M3.csv") |>
   mutate(
     month = dmy(trimws(Date))
@@ -193,10 +167,6 @@ m3 <- read.csv("data/PH_M3.csv") |>
   arrange (month) |>
   rename(PH_M3 = Close)
 
-head(m3, 5)
-```
-
-```{r}
 ofwr <- read.csv("data/PH_OFW_Remittances.csv") |>
   mutate (
     month = make_date(year, match(month, month.name), 1)
@@ -204,19 +174,14 @@ ofwr <- read.csv("data/PH_OFW_Remittances.csv") |>
   arrange(month) |>
   rename(PH_OFW_Remittances = Monthly)
 
-head(ofwr, 5)
-```
-
-```{r}
 ph_manufacturing <- read.csv("data/PH_Manufacturing_Production.csv") |>
   mutate(
     month = ymd(Date)
   ) |>
   arrange(month) |>
   rename(PH_Manufacturing_Production = Value)
-
-head(ph_manufacturing, 5)
 ```
+
 
 Now we can join all our data to the full dataset using left joins on the date.
 ```{r}
@@ -243,8 +208,13 @@ We can check our full dataset and interpret/check for scale, skewness, extreme v
 datasummary_skim(full_data |> dplyr::select(-month))
 ```
 
-PH_Manufacturing_Production stands out as an evident outlier in the data, with a standard deviation of 103.3. Although
+All 10 variables have 0% missing values across the full dataset, yielding a core sample size of $n = 96$ observations (spanning 8 years of monthly data). 
 
+The market return and exchange rate variables (`PLDT`, `PSEi`, and `USD_PHP`) display means and medians centered near $0.0$, with standard deviations ranging between $0.0$ and $0.1$. This behavior confirms that log-transformed returns exhibit stationary/statioc behavior for our linear modelling.
+
+Risk and policy rate indicators show more distinct distributional characteristics. The interest rate change variables (`BSP_RRP_Rate` and `PH_10Y_GS_Yield`) center near a mean and median of $0.0$ but exhibit higher satndard deviation ($\text{SD} = 0.2$ and $0.4$, respectively) possibly due to policy changes and market volatility. In contrast, the `VIX` operates on an index level with a mean of $19.7$ and median of $18.3$, displaying strong positive right-skewness ($\text{Max} = 57.7$) that can reflect sharp global market crisis spikes.
+
+Macroeconomic growth indicators (`PH_CPI`, `PH_M3`, and `PH_OFW_Remittances`) reflect real life economic shifts, with YoY inflation averaging $3.8\%$ and remittance growth averaging $3.1\%$. However, `PH_Manufacturing_Production` presents as a clear outlier relative to all other regressors. While its median growth is modest ($1.5\%$), its mean jumps to $20.9\%$ with an extreme standard deviation of $103.3\%$ and a peak maximum of $534.4\%$. This severe skew could possibly stem from pandemic/post-pandemic effects, thus providing a justification for testing robust regression techniques (e.g., Huber M-estimation) in later steps.
 
 ## Visualizations
 
@@ -260,7 +230,7 @@ ggplot(full_data, aes(month, PLDT)) +
 We can see that the values hovers around zero with no trend. Swings are relatively large (about -0.27 to +0.20), and there’s a big drop around late 2022 and a big gain around mid-2021. These highs and lows show historical events that affect returns, because in late 2022 PLDT Inc. experienced a major corporate crisis driven by a massive ₱48-billion capital expenditure budget overrun (https://insiderph.com/case-closed-pldt-settles-p167-m-budget-overrun-lawsuit-in-california-court). While in mid-2021 PLDT reported having record-breaking financial figures and massive fiber network expansion due to pandemic-era remote work and online learning(https://www.rappler.com/business/pldt-earnings-report-january-december-2021/). 
 
 
-**DIstribution of PLDT monthly log return**
+**Distribution of PLDT monthly log return**
 ```{r}
 ggplot(full_data, aes(PLDT)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = .6) +
@@ -294,30 +264,28 @@ There were some interesting scatterplot observations, where we evaluate best fit
 Next we have an initial regression model, we use Multiple Linear Regression (MLR) because our dependent variable (PLDT log returns) depends on multiple independent variables as mentioned above. We use the following formula:
 $$
 \begin{aligned}
-Y_i
+PLDT_i
 &= \beta_0 +
-\beta_1 X_{1i} +
-\beta_2 X_{2i} +
-\beta_3 X_{3i} +
-\cdots +
-\beta_k X_{ki} +
+\beta_1\, PSEi_i +
+\beta_2\, USD/PHP_i +
+\beta_3\, \text{BSP RRP Rate}_i + \\
+&\beta_4\, CPI_i +
+\beta_5\, \text{10Y Govt. Yield Change}_i +
+\beta_6\, \text{M3 Growth}_i + \\
+&\beta_7\, \text{OFW Remittance Growth}_i +
+\beta_8\, \text{Manufacturing Production Growth}_i + \\
+&\beta_9\, \text{VIX}_i +
 \varepsilon_i\\[6pt]
-&\text{Where:}\\
-&Y_i = \text{dependent variable for observation } i,\\
-&X_{ji} = \text{value of explanatory variable } j \text{ for observation } i,\\
-&\beta_0 = \text{intercept},\\
-&\beta_j = \text{coefficient on explanatory variable } j,\\
-&\varepsilon_i = \text{error term for observation } i,\\
-&k = \text{number of explanatory variables}.
 \end{aligned}
 $$
+
 For this section, we have the following null and alternative hypothesis at $\alpha = 0.05$
 $$
 \begin{aligned}
 H_0&: \beta_j = 0 \\
 H_1&: \beta_j \neq 0
 \\
-&\text{Where:}\\
+\text{Where:}\\
 &\beta = \text{A regressor coefficient}\\
 &j = 1, 2, \dots, 9 \text{ (regressor index)}\\
 \end{aligned}
@@ -335,29 +303,46 @@ m_full <- lm(
 
 summary(m_full)
 ```
-First, we see here that there us an adjusted R-squared of 0.08053 (or 8.053%), meaning that 9 regressors combined only explain 8.053% of the variation in PLDT returns, while the remaining ~92% is influenced by other factors not captured by the model. Next, looking at the p-value of 0.05887, we see that it is only slightly above the standard 0.05 threshold, further showing that the model is only somewhat significant. Therefore we fail to reject the null hypothesis. 
+First, we see here that there us an adjusted R-squared of $0.08053$ (or $8.053%$), meaning that 9 regressors combined only explain $8.053%$ of the variation in PLDT returns, while the remaining $~92%$ is influenced by other factors not captured by the model. Next, looking at the p-value of $0.05887$, we see that it is only slightly above the standard $0.05$ threshold, further showing that the model is only somewhat significant. Therefore we fail to reject the null hypothesis. 
 
-Looking at the `Pr(>|t|)` column, we see that the p-values for each individual regressor, almost all of them have values well above 0.05, meaning they are statistically insignificant individually. PSEi has the strongest relationship in the model. A 1-unit increase in PSEi returns is associated with a ~0.33 increase in PLDT returns, because its p-value is under 0.10, it is marginally significant at the 10% level.
+Looking at the `Pr(>|t|)` column, we see that the p-values for each individual regressor, almost all of them have values well above $0.05$, meaning they are statistically insignificant individually. `PSEi` has the strongest relationship in the model. A 1-unit increase in `PSEi` returns is associated with a $~0.33$ increase in `PLDT` returns, because its p-value is under $0.10$, it is marginally significant at the 10% level.
 
-While variables like PH_CPI, USD_PHP, BSP_RRP_Rate, PH_10Y_GS_Yield, PH_M3, PH_OFW_Remittances, PH_Manufacturing_Production, and VIX all have high p-values (> 0.10), but have no statistical significant over PLDT's returns when accounting for other regressors due to its low coefficient values.
+While variables like `PH_CPI`, `USD_PHP`, `BSP_RRP_Rate`, `PH_10Y_GS_Yield`, `PH_M3`, `PH_OFW_Remittances`, `PH_Manufacturing_Production`, and `VIX` all have high p-values ($> 0.10$), having no statistical significant over `PLDT`'s returns when accounting for other regressors due to its low coefficient values.
 
+## Coefficient interpretation
 
-## Statistical Inference
+Using the estimated parameters from our multiple linear regression model (`m_full`), we interpret the marginal effect of each regressor by holding all other variables constant:
 
-This would serve as the basis of <>
+* **Intercept ($\hat{\beta}_0 = -0.0122$):** When all independent variables are set to zero, the expected monthly log return of PLDT is $-1.22\%$.
+* **PSEi Market Return ($\hat{\beta}_1 = 0.3290, p = 0.0738$):** Holding all macroeconomic and global factors constant, a $1.00$ unit ($100\%$) increase in the PSEi log return is associated with a $0.3290$ ($+32.90$ percentage points) increase in PLDT's log return. This implies a stock beta relative to the local market of roughly $0.33$, and it is statistically significant at the $10\%$ level.
+* **USD/PHP Exchange Rate Change ($\hat{\beta}_3 = -0.5593, p = 0.3560$):** Holding other variables constant, a $1.00$ unit increase in the USD/PHP monthly log change is associated with a $-0.5593$ change in PLDT returns. While this makes sense from an economical standpoint (as depreciation increases foreign debt burden or import costs), the relationship is statistically insignificant ($p > 0.10$).
+* **BSP Policy Rate Change ($\hat{\beta}_4 = -0.0787, p = 0.1216$):** Holding other variables constant, a $1\%$ rate hike by the central bank is associated with a $-0.0787$ change in PLDT returns.
+* **VIX Volatility Index ($\hat{\beta}_9 = 0.0014, p = 0.3069$):** Holding other variables constant, a $1$-unit increase in global market volatility (VIX) is associated with a $0.0014$ change in PLDT returns. 
+* **Other Macroeconomic Variables (`PH_CPI`, `PH_10Y_GS_Yield`, `PH_M3`, `PH_OFW_Remittances`, `PH_Manufacturing_Production`):** Each of their respective coefficients represents the expected change in PLDT returns per 1-unit change in that macroeconomic indicator, holding all else constant. However, because their $p$-values exceed $0.10$, we conclude that these individual marginal effects are not statistically distinguishable from zero.
+
+# 3. Statistical Inference
+
+## Individual T-Tests
+```{r}
+```
+
+## Confidence Intervals
+
+The `confint()` function calculates the 95% confidence interval for each parameter in the regression model.
 
 ```{r}
 confint(m_full)
 ```
 
+The 95% confidence intervals provide a range of plausible values for each population regression coefficient. Notice that **every single interval contains zero** (e.g., PSEi ranges from $-0.0324$ to $+0.6905$; USD/PHP ranges from $-1.7572$ to $+0.6387$). Because zero is included within the 95% confidence interval for all parameters, this confirms that we fail to reject the null hypothesis at the 5% significance level for each individual regressor, aligning with our $t$-test $p$-values.
+
+## Joint Significance (F-Test)
 ```{r}
-colSums(is.na(full_data))
-full_data |> filter(if_any(everything(), is.na))
 ```
 
-# 3. Model Evaluation and Comparison
+# 4. Model Evaluation and Comparison
 
-Next we perform
+Next we compare our intitial model against 
 ```{r}
 full_data_clean <- model.frame(m_full)
 
@@ -377,11 +362,13 @@ BIC(m_market, m_macro, m_full)
 anova(m_market, m_full)
 ```
 
-# 4. Regression Diagnostics
+# 5. Regression Diagnostics
+
 ## Multicollinearity
 ```{r}
 vif(m_full)
 ```
+
 ## Heteroskedasticity
 ```{r}
 plot(fitted(m_full), resid(m_full),
@@ -390,11 +377,13 @@ abline(h = 0, lty = 2)
 
 bptest(m_full)
 ```
+
 ## Autocorrelation
 ```{r}
 dwtest(m_full)
 bgtest(m_full, order = 2)
 ```
+
 ## Outliers/Influential Observations
 ```{r}
 full_data_diag <- model.frame(m_full) |>
@@ -430,7 +419,7 @@ knitr::kable(
 ```
 
 
-# 5. Model Improvements
+# 6. Model Improvements
 ```{r}
 m_step <- MASS::stepAIC(m_full, direction = "both", trace = FALSE) # Stepwise Model Selection
 
@@ -453,3 +442,6 @@ modelsummary::modelsummary(
   gof_omit = "Log.Lik|RMSE",
   title = "Table 5.1: Model Comparison — Initial OLS, Robust Standard Errors, Stepwise Model, and Huber RLM")
 ```
+
+# 7. Financial Interpretation
+
