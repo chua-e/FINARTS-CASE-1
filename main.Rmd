@@ -380,7 +380,7 @@ The results show that the `PSEi` market return exerts the largest positive econo
 # 4. Model Evaluation and Comparison
 
 Next we compare our intitial model (`m_full`) against 2 other models,
-* `m_market` is a "market only model" (mirroring a CAPM framework), which uses only the local stock market index (`PSEi`) to explain `PLDT`'s returns.
+* `m_market` is a "market-only model" (mirroring a CAPM framework), which uses only the local stock market index (`PSEi`) to explain `PLDT`'s returns.
 * `m_macro` is a "macro-only model", which incorporates all macroeconomic indicators, monetary policy variables, and global risk factors (`VIX`) while excluding the stock market index.
 * `m_full` is our full model that combines both market risk and macroeconomic/global indicators.
 
@@ -402,6 +402,27 @@ BIC(m_market, m_macro, m_full)
 
 anova(m_market, m_full)
 ```
+
+**Goodness-of-Fit ($R^2$ and Adjusted $R^2$)**
+
+* `m_market`: Yields an $R^2$ of $0.047$ (Adjusted $R^2 = 0.037$). This indicates that standalone local market movements (`PSEi`) explain about $4.7\%$ of the total variation in `PLDT`'s monthly returns.
+* `m_macro`: Yields a higher raw $R^2$ of $0.136$ (Adjusted $R^2 = 0.056$). While macroeconomic factors capture a larger portion of total variance, the low adjusted $R^2$ reflects the downsides of adding numerous regressors with weak individual explanatory power.
+* `m_full`:  Combining both market and macroeconomic variables, `m_full` achieves the highest overall fit with an $R^2$ of $0.168$ and an Adjusted $R^2$ of $0.081$. This shows that combining market systematic risk and macro fundamentals explains roughly $16.8\%$ of return dispersion.
+
+
+**Model Selection Criteria**
+
+* `Akaike Information Criterion (AIC)`: AIC presents a score that estimates the relative quality of statistical models for a given set of data, with lower AIC values indicating a better balance between model fit and complexity. The market-only model achieves the lowest AIC score of $-213.2$, followed closely by the full model ($-210.2$) and the macro-only model ($-208.6$).
+* `Bayesian Information Criterion (BIC)`: BIC presents a score that balances goodness of fit against model complexity, meaning that it penalizes extra unnecessary parameters. With reference to this, the market-only model dominates with the lowest BIC of $-205.5$, compared to the macro-only model with $-183.0$ and the full model with $-182.0$.
+
+
+**Overall Model Significance**
+
+* `m_market`: Features an F-statistic of $4.653$ ($p < 0.05$), confirming that the single-factor market regression is statistically significant.  
+* `m_macro`: Yields an F-statistic of $1.711$, which fails to reach standard significance thresholds.
+* `m_full`: Yields an F-statistic of $1.925$ ($p < 0.1$), indicating that the full combination of variables achieves marginal overall significance at the $10\%$ level.
+
+Looking at the comparison, `PLDT`'s returns are more likely driven by broader market risk (`PSEi`). Although the full model slightly increases $R^2$ to $16.8\%$, the sharp increase in BIC reveals that macroeconomic variables introduce unnecessary noise rather than robust predictive power, reinforcing the need for a market-driven framework for asset pricing. 
 
 # 5. Regression Diagnostics
 
