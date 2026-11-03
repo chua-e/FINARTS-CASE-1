@@ -323,8 +323,23 @@ Using the estimated parameters from our multiple linear regression model (`m_ful
 # 3. Statistical Inference
 
 ## Individual T-Tests
+We perform individual two-tailed $t$-tests for each regression parameter, testing the null hypothesis $H_0: \beta_k = 0$ against the alternative hypothesis $H_a: \beta_k \neq 0$ at a $5\%$ significance level ($\alpha = 0.05$).
 ```{r}
+t_tests <- broom::tidy(m_full) |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::mutate(
+    decision = ifelse(p.value < 0.05, "Reject H0", "Fail to reject H0")
+  )
+
+knitr::kable(t_tests, digits = 4,
+             col.names = c("Variable", "Estimate", "Std. Error", "t", "p-value", "Decision (5%)"))
+
+qt(0.975, df.residual(m_full))
 ```
+
+* **PSEi Market Return ($p = 0.0738$):** The local stock market index yields a $t$-statistic of $1.8097$. While this falls just short of the strict 5% significance threshold (hence coded as "Fail to reject $H_0$" at $\alpha = 0.05$), it is **statistically significant at the 10% significance level** ($p < 0.10$). Its positive estimate ($0.3290$) confirms that broader market movements represent PLDT's primary systematic risk influence.
+* **All Macroeconomic and Global Risk Regressors:** Variables such as inflation (`PH_CPI`, $p = 0.8702$), exchange rate changes (`USD_PHP`, $p = 0.3560$), policy rates (`BSP_RRP_Rate`, $p = 0.1216$), and global volatility (`VIX`, $p = 0.3069$) all yield p-values well above the $0.05$ (and $0.10$) thresholds. 
+* **Conclusion on Individual Significance:** Because their confidence intervals include zero and their p-values exceed standard significance levels, we fail to reject the null hypothesis for these macroeconomic variables. Individually, they do not exhibit statistically robust linear relationships with `PLDT`'s returns in this full OLS specification, likely due to multicollinearity, shared variance, or noise in monthly macroeconomic releases.
 
 ## Confidence Intervals
 
@@ -333,16 +348,42 @@ The `confint()` function calculates the 95% confidence interval for each paramet
 ```{r}
 confint(m_full)
 ```
-
-The 95% confidence intervals provide a range of plausible values for each population regression coefficient. Notice that **every single interval contains zero** (e.g., PSEi ranges from $-0.0324$ to $+0.6905$; USD/PHP ranges from $-1.7572$ to $+0.6387$). Because zero is included within the 95% confidence interval for all parameters, this confirms that we fail to reject the null hypothesis at the 5% significance level for each individual regressor, aligning with our $t$-test $p$-values.
+The 95% confidence intervals provide a range of plausible values for each population regression coefficient. We see that each single interval contains zero (e.g., `PSEi` ranges from $-0.0324$ to $+0.6905$; USD/PHP ranges from $-1.7572$ to $+0.6387$). Because zero is included within the 95% confidence interval for all parameters, this confirms that we fail to reject the null hypothesis at the 5% significance level for each individual regressor, aligning with our t-test p-values.
 
 ## Joint Significance (F-Test)
+To test whether the explanatory variables have joint explanatory power over `PLDT`'s returns, we examine two $F$-tests.
 ```{r}
+f <- summary(m_full)$fstatistic
+f
+pf(f[1], f[2], f[3], lower.tail = FALSE)
+
+car::linearHypothesis(m_full, c(
+  "PH_CPI = 0", "USD_PHP = 0", "BSP_RRP_Rate = 0", "PH_10Y_GS_Yield = 0",
+  "PH_M3 = 0", "PH_OFW_Remittances = 0", "PH_Manufacturing_Production = 0", "VIX = 0"
+))
 ```
+
+The overall model $F$-test yields an $F$-statistic of $1.9246$ ($p = 0.0589$), allowing us to reject the null hypothesis of joint zero slopes at the $10\%$ significance level. However, a restricted linear hypothesis test examining the block of macroeconomic and risk variables jointly yields $F = 1.5559$ ($p = 0.1502$), indicating that these macro variables as a group do not achieve joint statistical significance at standard levels.
+
+## Economic Significance
+While individual $t$-tests measure statistical significance, economic significance evaluates the real-world magnitude of a 1-standard deviation ($\text{SD}$) shock in each regressor on PLDT's returns.
+```{r}
+sds <- sapply(full_data[names(coef(m_full))[-1]], sd)
+econ <- data.frame(
+  variable = names(sds),
+  effect_per_1sd = round(coef(m_full)[-1] * sds, 4)
+)
+econ
+```
+The results show that the `PSEi` market return exerts the largest positive economic impact ($+0.0170$ or $+1.70$ percentage points per 1-SD change), followed closely by `PH_Manufacturing_Production` ($+0.0133$). A 1-SD increase in the `BSP_RRP_Rate` ($-0.0173$) and `PH_OFW_Remittances` ($-0.0142$) exerts the largest downward economic pressures on `PLDT` returns, demonstrating that economic magnitude can remain substantial even when coefficients carry higher standard errors.
 
 # 4. Model Evaluation and Comparison
 
-Next we compare our intitial model against 
+Next we compare our intitial model (`m_full`) against 2 other models,
+* `m_market` is a "market only model" (mirroring a CAPM framework), which uses only the local stock market index (`PSEi`) to explain `PLDT`'s returns.
+* `m_macro` is a "macro-only model", which incorporates all macroeconomic indicators, monetary policy variables, and global risk factors (`VIX`) while excluding the stock market index.
+* `m_full` is our full model that combines both market risk and macroeconomic/global indicators.
+
 ```{r}
 full_data_clean <- model.frame(m_full)
 
