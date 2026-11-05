@@ -427,11 +427,38 @@ Looking at the comparison, `PLDT`'s returns are more likely driven by broader ma
 # 5. Regression Diagnostics
 
 ## Multicollinearity
+
+Multicollinearity occurs when two or more explanatory variables are highly linearly correlated, which can artificially inflate the standard errors of regression coefficients ($\hat{\beta}$) and lead to unstable parameter estimates. To evaluate the degree of multi-collinearity among the nine regressors, we examine the **Variance Inflation Factor (VIF)** for each predictor:
+
+$$
+\begin{aligned}
+\text{VIF}_k
+&= \frac{1}{1 - R_k^2} \\[6pt]
+&\text{Where:} \\
+&\text{VIF}_k = \text{Variance Inflation Factor for the } k\text{-th predictor,} \\
+&R_k^2 = \text{R-squared obtained from regressing the } k\text{-th regressor on all other regressors.}
+\end{aligned}
+$$
+
+where $R_k^2$ represents the coefficient of determination obtained from regressing the $k$-th independent variable on all remaining explanatory variables. A rule of thumb is that $\text{VIF}_k > 5$ indicates moderate multicollinearity, while $\text{VIF}_k > 10$ signifies severe multicollinearity that impairs model inference.
+
 ```{r}
 vif(m_full)
 ```
 
+*VIF Range ($1.12$ to $2.28$): All calculated Variance Inflation Factors are well below the conservative cutoff threshold of $5.0$. The highest values are observed in PH_CPI ($\text{VIF} = 2.28$) and BSP_RRP_Rate ($\text{VIF} = 2.00$), while PH_Manufacturing_Production ($\text{VIF} = 1.12$) and VIX ($\text{VIF} = 1.28$) display minimal collinearity.
+*Diagnostic Implication: Severe multicollinearity is absent from the specification. This confirms that linear interdependence among the macroeconomic and market regressors does not distort parameter precision or inflate the standard errors of individual $t$-tests.
+
 ## Heteroskedasticity
+
+In classical OLS, regression assumes homoskedasticity to a point where conditional variance of the error terms remains constant across all fitted values. Heteroskedasticity does not bias OLS point estimates, but it renders standard errors invalid, leading to unreliable hypothesis tests and confidence intervals. We assess heteroskedasticity visually using a Residuals vs. Fitted plot and formally using the Studentized Breusch-Pagan Test, evaluating:
+$$
+\begin{aligned}
+H_0 &: \sigma_1^2 = \sigma_2^2 = \cdots = \sigma_n^2 \quad \text{(Homoskedasticity)} \\[6pt]
+H_1 &: \sigma_i^2 = g(z_i) \quad \text{(Heteroskedasticity)}
+\end{aligned}
+$$
+
 ```{r}
 plot(fitted(m_full), resid(m_full),
      xlab = "Fitted", ylab = "Residuals", main = "Residuals vs. Fitted")
@@ -440,13 +467,40 @@ abline(h = 0, lty = 2)
 bptest(m_full)
 ```
 
+*Residuals vs. Fitted Plot: The residuals are evenly distributed around the horizontal zero reference line without exhibiting a clear fan, funnel, or non-linear systematic pattern, suggesting constant error variance across predicted values.
+*Breusch-Pagan Test: Yields a test statistic of $\text{BP} = 7.3247$ ($df = 9, p = 0.6034$). Because the $p$-value significantly exceeds the standard significance level ($\alpha = 0.05$), we fail to reject the null hypothesis of homoskedasticity.
+*Diagnostic Implication: The baseline regression model satisfies the constant variance assumption. However, to guard against potential small-sample heteroskedasticity or leverage points, heteroskedasticity-consistent standard errors (HC3) are formally evaluated in Section 6.
+
 ## Autocorrelation
+
+In time-series regression models of financial returns, error terms may exhibit serial dependency ($Cov(\varepsilon_t, \varepsilon_{t-s}) \neq 0$). Autocorrelation violates classical OLS assumptions; while point estimates ($\hat{\beta}$) remain unbiased, standard errors can become biased, leading to invalid $t$-tests and $F$-tests. To test for serial correlation in model residuals, we apply the Durbin-Watson test for first-order autocorrelation ($AR(1)$) and the Breusch-Godfrey test for higher-order autocorrelation up to lag 2 ($AR(2)$).
+
 ```{r}
 dwtest(m_full)
 bgtest(m_full, order = 2)
 ```
+*Durbin-Watson Test (dwtest): Tests $H_0: \rho = 0$ (no $AR(1)$ autocorrelation) against $H_a: \rho \neq 0$. A test statistic $d \approx 2.0$ indicates an absence of first-order serial correlation
+*Breusch-Godfrey Test (bgtest): Evaluates serial dependencies up to lag 2 ($AR(2)$). The test evaluates $H_0$: No residual autocorrelation up to lag 2 against $H_a$: Residuals follow an $AR(p)$ process.
+*Diagnostic Implication: While monthly asset returns typically exhibit weak linear autocorrelation, accounting for potential temporal dependency structures ensures valid standard errors. Consequently, Newey-West Heteroskedasticity and Autocorrelation Consistent (HAC) standard errors are estimated in Section 6 to guarantee robust hypothesis testing.
 
 ## Outliers/Influential Observations
+
+To detect influential data points that could disproportionately alter the regression slope estimates, Cook’s Distance was calculated for all $n = 96$ monthly observations. Cook’s Distance quantifies the aggregate shift in fitted values when the $i$-th observation is omitted from the dataset, combining the effects of leverage and standardized residuals:
+
+$$
+\begin{aligned}
+D_i
+&= \frac{e_i^{*2}}{p + 1} \left( \frac{h_{ii}}{1 - h_{ii}} \right) \\[6pt]
+&\text{Where:} \\
+&D_i = \text{Cook's Distance for observation } i, \\
+&e_i^* = \text{standardized residual for observation } i, \\
+&p = \text{number of predictor variables (regressors),} \\
+&h_{ii} = \text{leverage value for observation } i.
+\end{aligned}
+$$
+
+where $p = 9$ represents the number of predictors in the full baseline model. Observations exceeding the conventional threshold of $4/n$ (here, $4/96 \approx 0.0417$) were flagged for inspection.
+
 ```{r}
 full_data_diag <- model.frame(m_full) |>
   mutate( 
@@ -480,8 +534,14 @@ knitr::kable(
   caption = "Table: Observations Exceeding Cook's Distance Threshold (4/n)")
 ```
 
+*Bar Plot Interpretation: As illustrated in the Cook's Distance plot, the majority of monthly observations lie comfortably below the $4/n = 0.0417$ threshold line, indicating strong overall model stability across the sample period.
+*Flagged Observations: A small subset of observations exceeds the threshold, reflecting distinct historical periods of heightened macroeconomic or corporate volatility.
+*Sensitivity Strategy: Rather than automatically dropping these valid historical data points, sensitivity testing via Huber M-estimation (Robust Linear Modeling) is performed in Section 6 to confirm that coefficient directions and magnitudes remain stable when extreme leverage points are downweighted.
 
 # 6. Model Improvements
+
+To evaluate model stability and address potential violations of standard OLS assumptions—such as heteroskedasticity, autocorrelation, redundant predictors, and heavy-tailed outliers—four distinct model improvements were estimated alongside the baseline Initial OLS model
+
 ```{r}
 m_step <- MASS::stepAIC(m_full, direction = "both", trace = FALSE) # Stepwise Model Selection
 
@@ -504,6 +564,26 @@ modelsummary::modelsummary(
   gof_omit = "Log.Lik|RMSE",
   title = "Table 5.1: Model Comparison — Initial OLS, Robust Standard Errors, Stepwise Model, and Huber RLM")
 ```
+
+**OLS with HC3 Robust Standard Errors**
+*Description: Recalculates the variance-covariance matrix using the HC3 jackknife estimator without modifying OLS coefficient point estimates.
+*Primary Goal: Correct for heteroskedasticity and guard against small-sample leverage bias.
+*Findings: Standard errors for key variables expand, attenuating its marginal statistical significance ($p < 0.10$) and indicating that unadjusted standard OLS slightly understated parameter variance.
+
+**OLS with Newey-West HAC Standard Errors**
+*Description: Modifies the covariance structure to account simultaneously for unknown heteroskedasticity and autocorrelation across time lags (lag length = 2).
+*Primary Goal: Address serial correlation in time-series residuals, preventing artificially deflated standard errors and inflated Type I error rates.
+*Findings: OLS slope coefficients remain identical under Newey-West by construction. Adjusting for time-series residual dependencies modestly reduces the unrounded standard errors for PH_OFW_Remittances ($\beta = -0.003, p < 0.05$) and PH_Manufacturing_Production ($\beta = 0.000, p < 0.05$), bringing both to statistical significance. Although standard errors appear visually identical in Table 5.1 due to three-decimal rounding (0.002) and (0.000), the underlying $t$-statistics increase, demonstrating that serial correlation previously inflated standard errors in unadjusted OLS.
+
+**Stepwise Selection**
+*Description: An automated variable selection procedure using backward/forward search that iteratively removes predictors failing to contribute sufficient explanatory power relative to model complexity penalization.
+*Primary Goal: Mitigate overfitting and multicollinearity, drop uninformative noise, and optimize model parsimony.
+*Findings: Drops five redundant regressors (PH_CPI, USD_PHP, PH_10Y_GS_Yield, PH_M3, and VIX), yielding a parsimonious four-variable specification (PSEi, BSP_RRP_Rate, PH_OFW_Remittances, and PH_Manufacturing_Production). The Stepwise model maximizes Adjusted $R^2$ ($0.104$ vs. $0.081$), achieves the lowest information criteria ($\text{AIC} = -217.2$; $\text{BIC} = -201.9$), and delivers a statistically significant overall fit ($F = 3.751, p < 0.05$). Both PSEi ($\beta = 0.343, p < 0.05$) and BSP_RRP_Rate ($\beta = -0.074, p < 0.05$) emerge as statistically significant.
+
+**Huber Robust Linear Model**
+*Description: Fits the linear model via Huber M-estimation, applying quadratic loss to small residuals and linear loss to large residuals.
+*Primary Goal: Reduce sensitivity to influential outliers and heavy-tailed residuals without discarding observations.
+*Findings: Parameter estimates retain their directional signs relative to baseline OLS estimates (e.g., BSP_RRP_Rate at $-0.065$ and PH_OFW_Remittances at $-0.003$), confirming that extreme market leverage points do not distort the underlying directional relationships.
 
 # 7. Financial Interpretation
 
