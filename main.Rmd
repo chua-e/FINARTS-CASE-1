@@ -580,10 +580,102 @@ modelsummary::modelsummary(
 * Primary Goal: Mitigate overfitting and multicollinearity, drop uninformative noise, and optimize model parsimony.
 * Findings: Drops five redundant regressors (PH_CPI, USD_PHP, PH_10Y_GS_Yield, PH_M3, and VIX), yielding a parsimonious four-variable specification (PSEi, BSP_RRP_Rate, PH_OFW_Remittances, and PH_Manufacturing_Production). The Stepwise model maximizes Adjusted $R^2$ ($0.104$ vs. $0.081$), achieves the lowest information criteria ($\text{AIC} = -217.2$; $\text{BIC} = -201.9$), and delivers a statistically significant overall fit ($F = 3.751, p < 0.05$). Both PSEi ($\beta = 0.343, p < 0.05$) and BSP_RRP_Rate ($\beta = -0.074, p < 0.05$) emerge as statistically significant.
 
+# 7. Advanced Regression
+
 ### Huber Robust Linear Model
 * Description: Fits the linear model via Huber M-estimation, applying quadratic loss to small residuals and linear loss to large residuals.
 * Primary Goal: Reduce sensitivity to influential outliers and heavy-tailed residuals without discarding observations.
-* Findings: Parameter estimates retain their directional signs relative to baseline OLS estimates (e.g., BSP_RRP_Rate at $-0.065$ and PH_OFW_Remittances at $-0.003$), confirming that extreme market leverage points do not distort the underlying directional relationships.
+* Findings: Parameter estimates retain their directional signs relative to baseline OLS estimates (e.g., BSP_RRP_Rate at $-0.065$ and PH_OFW_Remittances at $-0.003$), confirming that extreme market leverage points do not distort the underlying directional relationships, the USD_PHP coefficient becomes more negative (-0.957) without reaching significance.Huber estimation lowers the PSEi coefficient from 0.329 to 0.203, so the estimated market beta is sensitive to the influential months. No macro variable becomes clearly significant after down-weighting, so the main findings remain unchanged.
 
-# 7. Financial Interpretation
+### Huber Robust Regression (RLM)
+```{r}
+m_huber <- rlm(
+  PLDT ~ PSEi + PH_CPI + USD_PHP + BSP_RRP_Rate + PH_10Y_GS_Yield +
+    PH_M3 + PH_OFW_Remittances + PH_Manufacturing_Production + VIX,
+  data = full_data,
+  psi = psi.huber,
+  maxit = 100
+)
 
+hub <- summary(m_huber)$coefficients
+hub_tab <- data.frame(
+  Estimate = hub[, "Value"],
+  SE       = hub[, "Std. Error"],
+  t        = hub[, "t value"],
+  p        = 2 * pt(abs(hub[, "t value"]),
+                    df = nobs(m_huber) - length(coef(m_huber)),
+                    lower.tail = FALSE)
+)
+round(hub_tab, 4)
+```
+
+```{r}
+full_data$huber_w <- m_huber$w
+full_data |>
+  dplyr::filter(month %in% as.Date(c("2020-03-01","2022-12-01","2021-08-01",
+                                     "2020-05-01","2018-11-01","2021-07-01",
+                                     "2021-02-01","2021-06-01"))) |>
+  dplyr::select(month, PLDT, PSEi, huber_w) |>
+  dplyr::arrange(huber_w)
+```
+
+```{r}
+modelsummary(
+  list("OLS" = m_full, "Huber (RLM)" = m_huber),
+  stars = c('+' = .1, '*' = .05, '**' = .01, '***' = .001),
+  gof_omit = "IC|Log|RMSE"
+)
+```
+
+```{r}
+full_data$HIGH_VIX <- as.numeric(full_data$VIX > median(full_data$VIX))
+m_int <- lm(PLDT ~ PSEi * HIGH_VIX, data = full_data)
+coeftest(m_int, vcov = sandwich::vcovHC(m_int, type = "HC3"))
+```
+
+# 8. Financial Interpretation
+
+As a small disclaimer, these recommendations are not to be directly taken as investment advice, but rather presenting our academic framing of findings and regression evidence through the project.
+
+### Summary
+
+PLDT’s monthly returns are positively associated with the local market, with a beta of about 0.33, 95% interval at about -0.03 to 0.69, and Huber 0.20. Domestic macro variables do not add much statistically reliable explanatory power as a group (p = 0.15), and the significance of individual variables depends on the standard error estimation. Currently, even the best models leave most of the return variation unexplained, with R2 at most 17% and 4.7% for the market-only model.
+
+### Recommendation
+
+* Don't rely on the domestic macroeconomic variables to explain or anticipate TEL’s monthly returns. Under the initial OLS, none of them is individually significant at 5%. As a group they are not jointly significant either (F = 1.5559, p =0.1502), and the macro-only model is not significant overall (F = 1.711, adjusted R² = 0.056)
+* Treat the few macro results that do become significant with caution. Under Newey-West standard errors, OFW remittances (p = 0.0442) and manufacturing production (p = 0.0414) cross the 5% level. However, their coefficients are very small (−0.0032 and 0.0001), the result does not appear under the initial OLS or HC3 estimates, and manufacturing growth contains extreme pandemic era base-effect values (−82% to +534%).
+* Use the local market as the main reference point for TEL. PSEi is the only variable with a consistently positive association (β ≈ 0.33 in the market-only and full models, 0.20 under Huber), suggesting TEL has moved less than the market. The market-only model also has the lowest BIC (−205.5). This relationship should not be overstated, since PSEi is not significant under HC3 or Newey-West standard errors (Table 5.1).
+* Pair any market-based view with company-specific information such as earnings, capital expenditure, and dividend announcements. Large residuals in months like December 2022 show that events specific to the company are not captured by the macro variables.
+
+### Limitations
+
+**Low explanatory power**
+
+The full model explains only 16.8% of the variation (adjusted R² = 0.081), so most of TEL’s returns are driven by factors outside the model, such as earnings, dividends, and competition.
+
+**Sample Size and period**
+
+The data has 96 monthly observations for nine regressors, and covers COVID-19 and the 2022 capex-overrun episode. Eight months exceed the Cook’s distance threshold, so a few events shape the estimates.
+
+**Dependent variable construction**
+
+PLDT returns are built from the NYSE-listed ADR (PHI) converted into pesos, not from TEL’s PSE price. Differences in trading hours may weaken the measured link to the PSEi. The return also includes the USD/PHP change by construction, so its relationship with the USD_PHP regressor is partly mechanical.
+
+**Variable timing and transformation**
+
+CPI, M3, OFW, and manufacturing are year-on-year rates, which overlap from month to month and can produce the autocorrelation found in Section VI. Macro data is also released with a lag, so a contemporaneous model cannot be used for forecasting.
+
+**Sensitivity to estimation method**
+
+Significance changes with the standard errors used (OFW and manufacturing under Newey-West only, PSEi under classical OLS only). The stepwise model was also selected using the same 96 observations it is evaluated on, so its fit is likely overstated.
+
+**Scope of the model**
+
+The model is linear and contemporaneous, with no lags or nonlinearities, and its results show association and not causation.
+
+### Conclusion
+
+This study examined whether domestic macroeconomic conditions help explain PLDT’s monthly stock returns beyond the movement of the Philippine stock market. The results suggest that, for the most part, they do not. PSEi is the only variable with a consistent positive association (about 0.33), the macro variables are not jointly significant, and even the best specification explains at most 16.8% of the variation in returns. Diagnostics found no multicollinearity or heteroskedasticity, but did find autocorrelation and eight influential months, so robust and HAC estimates were used to check the results.
+
+Overall, PLDT’s monthly reuters appear to depend more on market-wide movements and factors outside this model than on domestic macroeconomic conditions. Future work could add company fundamentals, lagged variables, and a longer sample, and use TEL’s PSE price directly.
